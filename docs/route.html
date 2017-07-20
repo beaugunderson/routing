@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>route.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id="background"></div>
+<div id='container'>
+  
+  <div class='section'>
+    <div class='docs'><h1>route.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      <p>from IPython.Shell import IPShellEmbed
+ipshell = IPShellEmbed()</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">namedtuple</span>
+
+<span class="kn">from</span> <span class="nn">graphserver.ext.routeserver.events</span> <span class="kn">import</span> <span class="n">BoardEvent</span><span class="p">,</span> <span class="n">DescribeCrossingAtAlightEvent</span><span class="p">,</span> <span class="n">AlightEvent</span><span class="p">,</span> <span class="n">StreetEvent</span><span class="p">,</span> <span class="n">HeadwayBoardEvent</span><span class="p">,</span> <span class="n">HeadwayAlightEvent</span>
+<span class="kn">from</span> <span class="nn">graphserver.ext.routeserver.events</span> <span class="kn">import</span> <span class="n">StreetTurnEvent</span><span class="p">,</span> <span class="n">StreetStartEvent</span><span class="p">,</span> <span class="n">StreetEndEvent</span>
+<span class="kn">from</span> <span class="nn">graphserver.ext.osm.osmdb</span> <span class="kn">import</span> <span class="n">OSMDB</span>
+
+<span class="kn">from</span> <span class="nn">graphserver.core</span> <span class="kn">import</span> <span class="n">Graph</span><span class="p">,</span> <span class="n">Link</span><span class="p">,</span> <span class="n">Street</span><span class="p">,</span> <span class="n">State</span><span class="p">,</span> <span class="n">WalkOptions</span><span class="p">,</span> <span class="n">Combination</span>
+<span class="kn">from</span> <span class="nn">graphserver.graphdb</span> <span class="kn">import</span> <span class="n">GraphDatabase</span>
+
+<span class="n">timezone</span> <span class="o">=</span> <span class="s">&#39;America/Los_Angeles&#39;</span>
+<span class="n">gtfsdb</span> <span class="o">=</span> <span class="s">&#39;king.gtfsdb&#39;</span>
+<span class="n">osmdb</span> <span class="o">=</span> <span class="s">&#39;king.highway.osmdb&#39;</span>
+
+<span class="n">NearbyVertex</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span><span class="s">&#39;NearbyVertex&#39;</span><span class="p">,</span> <span class="s">&#39;id latitude longitude distance_miles&#39;</span><span class="p">)</span>
+
+<span class="n">edge_events</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">vertex_events</span> <span class="o">=</span> <span class="p">[]</span>
+
+<span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="p">[</span><span class="n">BoardEvent</span><span class="p">,</span> <span class="n">DescribeCrossingAtAlightEvent</span><span class="p">,</span> <span class="n">AlightEvent</span><span class="p">,</span>
+        <span class="n">HeadwayBoardEvent</span><span class="p">,</span> <span class="n">HeadwayAlightEvent</span><span class="p">]:</span>
+    <span class="n">edge_events</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">e</span><span class="p">(</span><span class="n">gtfsdb_filename</span><span class="o">=</span><span class="n">gtfsdb</span><span class="p">,</span> <span class="n">timezone_name</span><span class="o">=</span><span class="n">timezone</span><span class="p">))</span>
+
+<span class="n">edge_events</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">StreetEvent</span><span class="p">(</span><span class="n">osmdb_filename</span><span class="o">=</span><span class="n">osmdb</span><span class="p">,</span> <span class="n">timezone_name</span><span class="o">=</span><span class="n">timezone</span><span class="p">))</span>
+
+<span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="p">[</span><span class="n">StreetTurnEvent</span><span class="p">,</span> <span class="n">StreetStartEvent</span><span class="p">,</span> <span class="n">StreetEndEvent</span><span class="p">]:</span>
+    <span class="n">vertex_events</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">e</span><span class="p">(</span><span class="n">osmdb_filename</span><span class="o">=</span><span class="n">osmdb</span><span class="p">,</span> <span class="n">timezone_name</span><span class="o">=</span><span class="n">timezone</span><span class="p">))</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div><div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p>vertex = self.nearest_node(lat, lon, use_index=False, range=self.range)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">vertex</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nearest_node</span><span class="p">(</span><span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="p">,</span> <span class="n">use_index</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="nb">range</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">range</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">vertex</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">NearbyVertex</span><span class="p">(</span><span class="o">*</span><span class="n">vertex</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">None</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div><div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <p>return tuple representing bounding box of reverse geocoder with form 
+(left, bottom, right, top)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">osmdb</span><span class="o">.</span><span class="n">bounds</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div><div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      <p>Calculate the great circle distance between two points
+on the earth (specified in decimal degrees)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div><div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>convert decimal degrees to radians</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">lon1</span><span class="p">,</span> <span class="n">lat1</span><span class="p">,</span> <span class="n">lon2</span><span class="p">,</span> <span class="n">lat2</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">radians</span><span class="p">,</span> <span class="p">[</span><span class="n">lon1</span><span class="p">,</span> <span class="n">lat1</span><span class="p">,</span> <span class="n">lon2</span><span class="p">,</span> <span class="n">lat2</span><span class="p">])</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div><div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      <p>haversine formula</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">dlon</span> <span class="o">=</span> <span class="n">lon2</span> <span class="o">-</span> <span class="n">lon1</span>
+        <span class="n">dlat</span> <span class="o">=</span> <span class="n">lat2</span> <span class="o">-</span> <span class="n">lat1</span>
+
+        <span class="n">a</span> <span class="o">=</span> <span class="n">sin</span><span class="p">(</span><span class="n">dlat</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">cos</span><span class="p">(</span><span class="n">lat1</span><span class="p">)</span> <span class="o">*</span> <span class="n">cos</span><span class="p">(</span><span class="n">lat2</span><span class="p">)</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">dlon</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
+
+        <span class="n">c</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">atan2</span><span class="p">(</span><span class="n">sqrt</span><span class="p">(</span><span class="n">a</span><span class="p">),</span> <span class="n">sqrt</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">a</span><span class="p">))</span>
+
+        <span class="n">miles</span> <span class="o">=</span> <span class="mf">3963.0</span> <span class="o">*</span> <span class="n">c</span>
+
+        <span class="k">return</span> <span class="n">miles</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div><div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <p>origin.distance_miles &gt;= 0.5:</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">return</span> <span class="p">(</span><span class="bp">None</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+
+    <span class="n">origin_walk_penalty</span> <span class="o">=</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">minutes</span><span class="o">=</span><span class="p">(</span><span class="n">origin</span><span class="o">.</span><span class="n">distance_miles</span> <span class="o">/</span> <span class="n">walk_options</span><span class="o">.</span><span class="n">walking_speed</span><span class="p">)</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">current_time</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">current_time</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">())</span>
+
+    <span class="n">start_time</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="n">stop_time</span> <span class="o">=</span> <span class="bp">None</span>
+
+    <span class="n">tree</span> <span class="o">=</span> <span class="bp">None</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">tree</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">shortest_path_tree</span><span class="p">(</span><span class="s">&#39;osm-</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">origin</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s">&#39;osm-</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">destination</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">State</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">current_time</span><span class="p">),</span> <span class="n">walk_options</span><span class="p">)</span>
+
+        <span class="n">vertices</span><span class="p">,</span> <span class="n">edges</span> <span class="o">=</span> <span class="n">tree</span><span class="o">.</span><span class="n">path</span><span class="p">(</span><span class="s">&#39;osm-</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">destination</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+        <span class="n">start</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="n">stop</span> <span class="o">=</span> <span class="bp">None</span>
+
+        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">vertices</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">v</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">time</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">start</span><span class="p">:</span>
+                    <span class="n">start</span> <span class="o">=</span> <span class="n">v</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">time</span>
+
+                <span class="n">stop</span> <span class="o">=</span> <span class="n">v</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">time</span>
+
+        <span class="n">start_time</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">fromtimestamp</span><span class="p">(</span><span class="n">start</span><span class="p">)</span>
+        <span class="n">stop_time</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">fromtimestamp</span><span class="p">(</span><span class="n">stop</span><span class="p">)</span>
+
+        <span class="n">start_time</span> <span class="o">-=</span> <span class="n">origin_walk_penalty</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">tree</span><span class="p">:</span>
+            <span class="n">tree</span><span class="o">.</span><span class="n">destroy</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="p">(</span><span class="n">start_time</span><span class="p">,</span> <span class="n">stop_time</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div><div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      <p>narrative = list(postprocess_path(vertices, edges))
+return json.dumps({ 'narrative': narrative }, indent=3, cls=SelfEncoderHelper)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div><div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      <p>Longitude -180 to 180, negatives increase westward
+Latitude -90 to 90, negatives increase south</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div><div class='section' id='section-9'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-9'>#</a>
+      </div>
+      <p>Search bounding box
+lat_start = 47.7324
+lat_stop = 47.4875
+lon_start = -122.2689
+lon_stop = -122.0588</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="n">walk_options</span> <span class="o">=</span> <span class="n">WalkOptions</span><span class="p">()</span>
+
+<span class="n">walk_options</span><span class="o">.</span><span class="n">transfer_penalty</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">walk_options</span><span class="o">.</span><span class="n">walking_speed</span> <span class="o">=</span> <span class="mf">1.0</span>
+<span class="n">walk_options</span><span class="o">.</span><span class="n">hill_reluctance</span> <span class="o">=</span> <span class="mf">1.5</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div><div class='section' id='section-10'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-10'>#</a>
+      </div>
+      <p>walk_options.turn_penalty = 
+walk_options.walking_reluctance = 
+walk_options.max_walk = </p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div><div class='section' id='section-11'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-11'>#</a>
+      </div>
+      <p>The full Metro boundaries
+lon_start = -122.506729
+lon_stop = -121.785828
+lat_start = 47.9323654
+lat_stop = 47.1891136</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div><div class='section' id='section-12'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-12'>#</a>
+      </div>
+      <p>Seattle &amp; the East side</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="n">lat_start</span> <span class="o">=</span> <span class="mf">47.7</span>
+<span class="n">lat_stop</span> <span class="o">=</span> <span class="mf">47.5</span>
+<span class="n">lon_start</span> <span class="o">=</span> <span class="o">-</span><span class="mf">122.433</span>
+<span class="n">lon_stop</span> <span class="o">=</span> <span class="o">-</span><span class="mf">122.04</span>
+
+<span class="n">dt</span> <span class="o">=</span> <span class="n">datetime</span><span class="p">(</span><span class="mi">2011</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">22</span><span class="p">,</span> <span class="mi">9</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+<span class="n">current_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">mktime</span><span class="p">(</span><span class="n">dt</span><span class="o">.</span><span class="n">timetuple</span><span class="p">())</span>
+
+<span class="n">max_density</span> <span class="o">=</span> <span class="mi">100</span>
+
+<span class="n">lat_distance</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">lat_stop</span> <span class="o">-</span> <span class="n">lat_start</span><span class="p">)</span>
+<span class="n">lon_distance</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">lon_stop</span> <span class="o">-</span> <span class="n">lon_start</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div><div class='section' id='section-13'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-13'>#</a>
+      </div>
+      <p>Normalize a square density for a possibly rectangular grid</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">if</span> <span class="n">lat_distance</span> <span class="o">&gt;</span> <span class="n">lon_distance</span><span class="p">:</span>
+    <span class="n">lat_grid</span> <span class="o">=</span> <span class="n">max_density</span>
+    <span class="n">lon_grid</span> <span class="o">=</span> <span class="nb">int</span><span class="p">((</span><span class="n">lon_distance</span> <span class="o">/</span> <span class="n">lat_distance</span><span class="p">)</span> <span class="o">*</span> <span class="n">max_density</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">lon_grid</span> <span class="o">=</span> <span class="n">max_density</span>
+    <span class="n">lat_grid</span> <span class="o">=</span> <span class="nb">int</span><span class="p">((</span><span class="n">lat_distance</span> <span class="o">/</span> <span class="n">lon_distance</span><span class="p">)</span> <span class="o">*</span> <span class="n">max_density</span><span class="p">)</span>
+
+<span class="n">lat_increment</span> <span class="o">=</span> <span class="p">(</span><span class="n">lat_stop</span> <span class="o">-</span> <span class="n">lat_start</span><span class="p">)</span> <span class="o">/</span> <span class="n">lat_grid</span>
+<span class="n">lon_increment</span> <span class="o">=</span> <span class="p">(</span><span class="n">lon_stop</span> <span class="o">-</span> <span class="n">lon_start</span><span class="p">)</span> <span class="o">/</span> <span class="n">lon_grid</span>
+
+<span class="n">geocoder_range</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="nb">min</span><span class="p">((</span><span class="n">lat_increment</span> <span class="o">/</span> <span class="mi">3</span><span class="p">,</span> <span class="n">lon_increment</span> <span class="o">/</span> <span class="mi">3</span><span class="p">)))</span>
+
+<span class="n">reverse_geocode</span> <span class="o">=</span> <span class="n">ModifiedOSMReverseGeocoder</span><span class="p">(</span><span class="n">osmdb_filename</span><span class="o">=</span><span class="n">osmdb</span><span class="p">,</span>
+        <span class="nb">range</span><span class="o">=</span><span class="n">geocoder_range</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div><div class='section' id='section-14'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-14'>#</a>
+      </div>
+      <p>Work</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="n">destination_lat</span> <span class="o">=</span> <span class="mf">47.611512</span>
+<span class="n">destination_lon</span> <span class="o">=</span> <span class="o">-</span><span class="mf">122.334329</span>
+
+<span class="n">destination</span> <span class="o">=</span> <span class="n">reverse_geocode</span><span class="p">(</span><span class="n">destination_lat</span><span class="p">,</span> <span class="n">destination_lon</span><span class="p">)</span>
+
+<span class="k">print</span> <span class="s">&quot;Point density&quot;</span><span class="p">,</span> <span class="n">max_density</span>
+<span class="k">print</span> <span class="s">&quot;Using grids lat </span><span class="si">%d</span><span class="s">, lon </span><span class="si">%d</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">lat_grid</span><span class="p">,</span> <span class="n">lon_grid</span><span class="p">)</span>
+<span class="k">print</span> <span class="s">&quot;Increments lat </span><span class="si">%f</span><span class="s">, lon </span><span class="si">%f</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">lat_increment</span><span class="p">,</span> <span class="n">lon_increment</span><span class="p">)</span>
+<span class="k">print</span> <span class="s">&quot;Geocoder range&quot;</span><span class="p">,</span> <span class="n">geocoder_range</span>
+<span class="k">print</span> <span class="s">&quot;Using time&quot;</span><span class="p">,</span> <span class="n">dt</span><span class="o">.</span><span class="n">ctime</span><span class="p">()</span>
+<span class="k">print</span> <span class="s">&quot;Bounding box tlbr: </span><span class="si">%f</span><span class="s">, </span><span class="si">%f</span><span class="s">, </span><span class="si">%f</span><span class="s">, </span><span class="si">%f</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">lat_start</span><span class="p">,</span> <span class="n">lon_start</span><span class="p">,</span> <span class="n">lat_stop</span><span class="p">,</span> <span class="n">lon_stop</span><span class="p">)</span>
+<span class="k">print</span> <span class="s">&quot;Checking </span><span class="si">%d</span><span class="s"> routes&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">lat_grid</span> <span class="o">*</span> <span class="n">lon_grid</span><span class="p">)</span>
+
+<span class="n">minimum</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">maxint</span>
+<span class="n">maximum</span> <span class="o">=</span> <span class="o">-</span><span class="n">sys</span><span class="o">.</span><span class="n">maxint</span> <span class="o">-</span> <span class="mi">1</span>
+
+<span class="n">min_lon</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">maxint</span>
+<span class="n">max_lon</span> <span class="o">=</span> <span class="o">-</span><span class="n">sys</span><span class="o">.</span><span class="n">maxint</span> <span class="o">-</span> <span class="mi">1</span>
+
+<span class="n">min_lat</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">maxint</span>
+<span class="n">max_lat</span> <span class="o">=</span> <span class="o">-</span><span class="n">sys</span><span class="o">.</span><span class="n">maxint</span> <span class="o">-</span> <span class="mi">1</span>
+
+<span class="n">gdb</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="p">(</span><span class="s">&#39;king.highway.gdb&#39;</span><span class="p">)</span>
+<span class="n">graph</span> <span class="o">=</span> <span class="n">gdb</span><span class="o">.</span><span class="n">incarnate</span><span class="p">()</span>
+
+<span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div><div class='section' id='section-15'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-15'>#</a>
+      </div>
+      <p>missing_value = None</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="n">missing_value</span> <span class="o">=</span> <span class="mi">50000</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">lat_grid</span><span class="p">):</span>
+    <span class="n">row</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">print</span> <span class="s">&quot;Row </span><span class="si">%d</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">i</span>
+
+    <span class="n">lat</span> <span class="o">=</span> <span class="n">lat_start</span> <span class="o">+</span> <span class="p">(</span><span class="n">i</span> <span class="o">*</span> <span class="n">lat_increment</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">lat</span> <span class="o">&lt;</span> <span class="n">min_lat</span><span class="p">:</span>
+        <span class="n">min_lat</span> <span class="o">=</span> <span class="n">lat</span>
+
+    <span class="k">if</span> <span class="n">lat</span> <span class="o">&gt;</span> <span class="n">max_lat</span><span class="p">:</span>
+        <span class="n">max_lat</span> <span class="o">=</span> <span class="n">lat</span>
+
+    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">lon_grid</span><span class="p">):</span>
+        <span class="n">lon</span> <span class="o">=</span> <span class="n">lon_start</span> <span class="o">+</span> <span class="p">(</span><span class="n">j</span> <span class="o">*</span> <span class="n">lon_increment</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">lon</span> <span class="o">&lt;</span> <span class="n">min_lon</span><span class="p">:</span>
+            <span class="n">min_lon</span> <span class="o">=</span> <span class="n">lon</span>
+
+        <span class="k">if</span> <span class="n">lon</span> <span class="o">&gt;</span> <span class="n">max_lon</span><span class="p">:</span>
+            <span class="n">max_lon</span> <span class="o">=</span> <span class="n">lon</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div><div class='section' id='section-16'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-16'>#</a>
+      </div>
+      <p>Provide padding</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">i</span> <span class="o">==</span> <span class="n">lat_grid</span> <span class="o">-</span> <span class="mi">1</span> <span class="ow">or</span> \
+                <span class="n">j</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">j</span> <span class="o">==</span> <span class="n">lon_grid</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">row</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">missing_value</span><span class="p">)</span>
+
+            <span class="k">continue</span>
+
+        <span class="n">start</span><span class="p">,</span> <span class="n">stop</span> <span class="o">=</span> <span class="n">path</span><span class="p">(</span><span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="p">,</span> <span class="n">destination</span><span class="p">,</span> <span class="n">graph</span><span class="p">,</span>
+                <span class="n">walk_options</span><span class="p">,</span> <span class="n">reverse_geocode</span><span class="o">=</span><span class="n">reverse_geocode</span><span class="p">,</span> <span class="n">current_time</span><span class="o">=</span><span class="n">current_time</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">start</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">stop</span><span class="p">:</span>
+            <span class="n">row</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">missing_value</span><span class="p">)</span>
+
+            <span class="k">continue</span>
+
+        <span class="n">delta</span> <span class="o">=</span> <span class="n">stop</span> <span class="o">-</span> <span class="n">start</span>
+
+        <span class="n">trip_time</span> <span class="o">=</span> <span class="n">delta</span><span class="o">.</span><span class="n">total_seconds</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">trip_time</span> <span class="o">&lt;</span> <span class="n">minimum</span><span class="p">:</span>
+            <span class="n">minimum</span> <span class="o">=</span> <span class="n">trip_time</span>
+
+        <span class="k">if</span> <span class="n">trip_time</span> <span class="o">&gt;</span> <span class="n">maximum</span><span class="p">:</span>
+            <span class="n">maximum</span> <span class="o">=</span> <span class="n">trip_time</span>
+
+        <span class="n">row</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">trip_time</span><span class="p">)</span>
+
+    <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">row</span><span class="p">)</span>
+
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s">&#39;output-map.txt&#39;</span><span class="p">,</span> <span class="s">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">i</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">j</span><span class="p">:</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&quot;X&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&quot; &quot;</span><span class="p">)</span>
+
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">)</span>
+
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s">&#39;output.js&#39;</span><span class="p">,</span> <span class="s">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&quot;var output_normal = </span><span class="si">%s</span><span class="s">;</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span>
+        <span class="s">&#39;min_z&#39;</span><span class="p">:</span> <span class="n">minimum</span><span class="p">,</span>
+        <span class="s">&#39;max_z&#39;</span><span class="p">:</span> <span class="n">maximum</span><span class="p">,</span>
+        <span class="s">&#39;min_lon&#39;</span><span class="p">:</span> <span class="n">min_lon</span><span class="p">,</span>
+        <span class="s">&#39;max_lon&#39;</span><span class="p">:</span> <span class="n">max_lon</span><span class="p">,</span>
+        <span class="s">&#39;min_lat&#39;</span><span class="p">:</span> <span class="n">min_lat</span><span class="p">,</span>
+        <span class="s">&#39;max_lat&#39;</span><span class="p">:</span> <span class="n">max_lat</span><span class="p">,</span>
+        <span class="s">&#39;data&#39;</span><span class="p">:</span> <span class="n">rows</span><span class="p">},</span> <span class="n">indent</span><span class="o">=</span><span class="mi">3</span><span class="p">)))</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

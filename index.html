@@ -1,0 +1,472 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+ <head>
+  <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+  <meta http-equiv="content-type" content="text/html;charset=utf-8" />
+
+  <script type="text/javascript" src="js/protovis-r3.2.js"></script>
+
+  <script type="text/javascript" src="http://maps.google.com/maps/api/js?sensor=false"></script> 
+
+  <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.5.0/jquery.min.js"></script>
+  <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.10/jquery-ui.min.js"></script>
+
+  <script type="text/javascript" src="js/jquery.ba-dotimeout.min.js"></script>
+  <script type="text/javascript" src="js/conrec.js"></script>
+
+  <script type="text/javascript" src="output.js"></script>
+
+  <link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.10/themes/base/jquery-ui.css" />
+
+  <style type="text/css">
+   html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    border: 0;
+   }
+
+   body {
+    font: 14px/134% Helvetica Neue, sans-serif;
+   }
+
+   #controls {
+    width: 300px;
+    height: 200px;
+    position: absolute;
+    right: 50px;
+    bottom: 50px;
+    border: 5px solid #666;
+    background-color: #aaa;
+    border-radius: 8px;
+    -moz-border-radius: 8px;
+    -webkit-border-radius: 8px;
+    -webkit-box-shadow: 2px 2px 6px rgba(0,0,0,0.6);
+    padding: 15px;
+   }
+
+   #progress {
+    text-align: center;
+    vertical-align: middle;
+    display: table-cell;
+    text-transform: small-caps;
+    font-family: Georgia;
+    font-size: 2em;
+    width: 200px;
+    height: 60px;
+    position: absolute;
+    left: 50%;
+    margin-left: -100px;
+    top: 50%;
+    margin-top: -30px;
+    border: 5px solid #666;
+    background-color: #aaa;
+    border-radius: 8px;
+    -moz-border-radius: 8px;
+    -webkit-border-radius: 8px;
+    -webkit-box-shadow: 2px 2px 6px rgba(0,0,0,0.6);
+    padding: 15px;
+    z-index: 5;
+    display: none;
+   }
+
+   input {
+    border: 0;
+    font-weight: bold;
+    width: 50px;
+    background-color: #aaa;
+   }
+
+   input[type=checkbox] {
+    width: auto; 
+   }
+
+   div.select {
+    margin: 10px;
+   }
+
+   #map .canvas {
+    position: absolute;
+   }
+
+   #fig {
+    position: relative;
+   }
+
+   #fig, #map {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    border: 0;
+   }
+  </style>
+
+  <script type="text/javascript+protovis">
+  HeatmapOverlay.prototype = new google.maps.OverlayView();
+
+  function HeatmapOverlay(bounds, map) {
+   this.bounds_ = bounds;
+   this.map_ = map;
+
+   this.div_ = null;
+   this.viz_ = null;
+
+   this.setMap(map);
+  }
+
+  HeatmapOverlay.prototype.onAdd = function() {
+   var div = document.createElement('div');
+   div.setAttribute('class', 'canvas');
+
+   this.div_ = div;
+
+   var panes = this.getPanes();
+   panes.overlayImage.appendChild(div);
+  }
+
+  HeatmapOverlay.prototype.render = function() {
+   this.viz_.render();
+  }
+
+  HeatmapOverlay.prototype.onRemove = function() {
+   this.div_.parentNode.removeChild(this.div_);
+   this.div_ = null;
+  }
+
+  HeatmapOverlay.prototype.draw = function() {
+   $.doTimeout('heatmap-draw', 0, function() {
+    var overlayProjection = overlay.getProjection();
+
+    var r = 50;
+
+    var min_x = 10000;
+    var min_y = 10000;
+    var max_x = -10000;
+    var max_y = -10000;
+
+    for (level_key in contour_levels) {
+     var current_level = contour_levels[level_key];
+     var current_level_value = levels[level_key];
+
+     for (contour_key in current_level) {
+      var current_contour = current_level[contour_key];
+
+      current_contour.level = current_level_value;
+
+      for (point_key in current_contour) {
+       var current_point = current_contour[point_key];
+
+       var p = overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(lat(current_point.y), lon(current_point.x)));
+
+       current_point.google = p;
+
+       if (p.x < min_x) {
+        min_x = p.x;
+       }
+       if (p.x > max_x) {
+        max_x = p.x;
+       }
+       if (p.y < min_y) {
+        min_y = p.y;
+       }
+       if (p.y > max_y) {
+        max_y = p.y;
+       }
+      }
+     }
+    }
+
+    //var sw = overlayProjection.fromLatLngToDivPixel(this.bounds_.getSouthWest());
+    //var ne = overlayProjection.fromLatLngToDivPixel(this.bounds_.getNorthEast());
+
+    var div = overlay.div_;
+
+    div.style.width = (max_x - min_x + 2 * r) + "px";
+    div.style.height = (max_y - min_y + 2 * r) + "px";
+    div.style.left = min_x - r + "px";
+    div.style.top = min_y - r + "px";
+
+    //div.style.left = sw.x + 'px';
+    //div.style.top = ne.y + 'px';
+    //div.style.width = (ne.x - sw.x) + 'px';
+    //div.style.height = (sw.y - ne.y) + 'px';
+
+    overlay.viz_ = new pv.Panel()
+    .canvas(div)
+    .data(contour_levels)
+    .add(pv.Panel)
+    .data(function(d) d)
+    .add(pv.Line)
+    .data(function(d) d)
+    .left(function(d) {
+     return d.google.x - min_x + r;
+    })
+    .top(function(d) {
+     return d.google.y - min_y + r;
+    })
+    .interpolate(function() "basis")
+    .lineJoin("null")
+    .segmented(false)
+    .def('fillStyle', function() {
+     if (!filled) {
+      return null;
+     }
+
+     var level = this.parent.data().level;
+
+     // XXX move level check to another function for speed?
+     if (levels.indexOf(level) >= visible_min && levels.indexOf(level) <= visible_max) {
+      return colours(level).alpha(opacities(level));
+     } else {
+      return null;
+     }
+    })
+    .event("mouseover", function() this.fillStyle("red")) // override
+    .event("mouseout", function() this.fillStyle(undefined)) // restore
+    .strokeStyle(function() {
+     if (!stroked) {
+      return null;
+     }
+
+     var level = this.parent.data().level;
+
+     if (levels.indexOf(level) >= visible_min && levels.indexOf(level) <= visible_max) {
+      return '#666';
+     } else {
+      return null;
+     }
+    })
+    .lineWidth(1);
+
+    overlay.viz_.render();
+   });
+  }
+  </script>
+
+  <script type="text/javascript">
+  //data globals
+  var output = output_normal;
+  var data = output.data;
+
+  //ui globals
+  var steps = 8;
+  var step_size;
+  var visible_min = 1;
+  var visible_max = steps;
+  var stroked = true;
+  var filled = true;
+  var overlay;
+
+  var c = new Conrec(),
+  xs, ys, zs,
+  lon, lat,
+  colours,
+  opacities;
+
+  var contours,
+  contour_list,
+  contour_levels,
+  levels;
+
+  function setup_values() {
+   step_size = (output.max_z - output.min_z) / steps;
+   xs = pv.range(0, data[0].length);
+   ys = pv.range(0, data.length);
+   zs = pv.range(output.min_z, output.max_z, step_size);
+   //lon = pv.Scale.linear(xs).range(output.min_lon, output.max_lon);
+   //lat = pv.Scale.linear(ys).range(output.min_lat, output.max_lat);
+   lon = pv.Scale.linear(xs).range(output.max_lon, output.min_lon);
+   lat = pv.Scale.linear(ys).range(output.max_lat, output.min_lat);
+   colours = pv.Scale.linear(zs).range('green', 'yellow');
+   opacities = pv.Scale.linear(zs).range(0.3, 0.1);
+  }
+
+  function setup_contours() {
+   contours = c.contour(data, 0, xs.length - 1, 0, ys.length - 1, xs, ys, zs.length, zs);
+   contour_list = c.contourList().sort(levelOrder);
+
+   contour_levels = new Array();
+   levels = new Array();
+
+   for (contour_key in contour_list) {
+    var current_contour = contour_list[contour_key];
+    var current_level = current_contour.level;
+
+    if (levels.indexOf(current_level) < 0) {
+     levels.push(current_level);
+    }
+
+    var current_level_number = levels.indexOf(current_level);
+
+    if (!contour_levels[current_level_number]) {
+     contour_levels[current_level_number] = new Array();
+    }
+
+    contour_levels[current_level_number].push(current_contour);
+   }
+  }
+
+  function levelOrder(a, b) {
+   return a.level - b.level;
+  }
+
+  function update_function(recontour) {
+   console.log('Timeout, drawing...');
+
+   $('#progress').show();
+
+   // XXX Hack to make sure the progress bar shows up.
+   $.doTimeout('draw', 0, function() {
+    setup_controls();
+    setup_values();
+
+    if (recontour) {
+     setup_contours();
+    }
+
+    overlay.draw();
+
+    $('#progress').hide();
+
+    console.log('Drawing finished.');
+   });
+  }
+
+  function setup_controls() {
+   try { $('#layers').slider('destroy'); } catch (e) { console.log('Failed to destroy #layers'); }
+   $('#layers').slider({
+    value: steps,
+    min: 1,
+    max: 50,
+    step: 1,
+    start: function(event, ui) {
+     this.start_value = ui.value;
+
+     $.doTimeout('redraw');
+    },
+    slide: function(event, ui) {
+     steps = ui.value;
+     visible_max = steps;
+
+     $('#layers-input').val(steps);
+
+     $.doTimeout('redraw');
+    },
+    stop: function(event, ui) {
+     if (this.start_value == ui.value) {
+      return;
+     }
+
+     $.doTimeout('redraw', 500, function() { update_function(true) });
+    }
+   });
+
+   try { $('#visible-range').slider('destroy'); } catch (e) { console.log('Failed to destroy #visible-range'); }
+
+   $('#visible-range').slider({
+    range: true,
+    values: [visible_min, visible_max],
+    min: 1,
+    max: steps,
+    step: 1,
+    start: function(event, ui) {
+     this.start_values = ui.values;
+
+     $.doTimeout('redraw');
+    },
+    slide: function(event, ui) {
+     visible_min = ui.values[0];
+     visible_max = ui.values[1];
+
+     $('#visible-range-input').val(visible_min + ' - ' + visible_max);
+
+     $.doTimeout('redraw');
+    },
+    stop: function(event, ui) {
+     if (this.start_values[0] == ui.values[0] && this.start_values[1] == ui.values[1]) {
+      return;
+     }
+
+     $.doTimeout('redraw', 500, function() { update_function(false); });
+    }
+   });
+
+   $('#visible-range-input').val(visible_min + ' - ' + visible_max);
+   $('#layers-input').val(steps);
+
+   $('#fill-checkbox').click(function() {
+    filled = !filled;
+
+    overlay.render();
+   });
+
+   $('#stroke-checkbox').click(function() {
+    stroked = !stroked;
+
+    overlay.render();
+   });
+  }
+
+  function init() {
+   setup_values();
+   setup_contours();
+
+   //var baghdad = new google.maps.LatLng(33.19, 43.99);
+
+   var myOptions = {
+    zoom: 7,
+    //center: baghdad,
+    mapTypeId: google.maps.MapTypeId.SATELLITE
+   };
+
+   var map = new google.maps.Map(document.getElementById("map"), myOptions);
+
+   console.log(output.min_lat, output.max_lat);
+   console.log(output.min_lon, output.max_lon);
+
+   var swBound = new google.maps.LatLng(output.min_lat, output.min_lon);
+   var neBound = new google.maps.LatLng(output.max_lat, output.max_lon);
+
+   var bounds = new google.maps.LatLngBounds(swBound, neBound);
+
+   console.log(bounds.getNorthEast());
+   console.log(bounds.getSouthWest());
+
+   map.fitBounds(bounds);
+
+   overlay = new HeatmapOverlay(bounds, map);
+
+   setup_controls();
+  }
+  </script>
+ </head>
+ <body onload="init()">
+  <div id="map"></div>
+
+  <div id="progress">
+   Refreshing...
+  </div>
+
+  <div id="controls">
+   <label for="layers-input" id="layers-label">Layers:</label>
+   <input type="text" id="layers-input" />
+
+   <div class="select" id="layers"></div>
+
+   <label for="visible-range-input" id="visible-range-label">Visible range:</label>
+   <input type="text" id="visible-range-input" />
+
+   <div class="select" id="visible-range"></div>
+
+   <label for="fill-checkbox" id="fill-label">Fill each level:</label>
+   <input type="checkbox" id="fill-checkbox" checked="checked" />
+
+   <br />
+
+   <label for="stroke-checkbox" id="stroke-label">Stroke each level:</label>
+   <input type="checkbox" id="stroke-checkbox" checked="checked" />
+  </div>
+ </body>
+</html>

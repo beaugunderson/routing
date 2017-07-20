@@ -1,0 +1,391 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+ <head>
+  <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+  <meta http-equiv="content-type" content="text/html;charset=utf-8" />
+
+  <script type="text/javascript" src="protovis/protovis.js"></script>
+
+  <script type="text/javascript" src="http://maps.google.com/maps/api/js?sensor=false"></script> 
+
+  <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.5.0/jquery.min.js"></script>
+  <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.10/jquery-ui.min.js"></script>
+
+  <script type="text/javascript" src="js/jquery.ba-dotimeout.min.js"></script>
+  <script type="text/javascript" src="js/conrec.js"></script>
+
+  <script type="text/javascript" src="output.js"></script>
+
+  <link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.10/themes/base/jquery-ui.css" />
+  <link rel="stylesheet" href="index.css" />
+
+  <script type="text/javascript+protovis">
+  HeatmapOverlay.prototype = new google.maps.OverlayView();
+
+  function HeatmapOverlay(bounds, map) {
+   this.bounds_ = bounds;
+   this.map_ = map;
+
+   this.div_ = null;
+   this.viz_ = null;
+
+   this.setMap(map);
+  }
+
+  HeatmapOverlay.prototype.onAdd = function() {
+   var div = document.createElement('div');
+   div.setAttribute('class', 'canvas');
+
+   this.div_ = div;
+
+   var panes = this.getPanes();
+   panes.overlayImage.appendChild(div);
+  }
+
+  HeatmapOverlay.prototype.render = function() {
+   this.viz_.render();
+  }
+
+  HeatmapOverlay.prototype.onRemove = function() {
+   this.div_.parentNode.removeChild(this.div_);
+   this.div_ = null;
+  }
+
+  HeatmapOverlay.prototype.draw = function() {
+   $.doTimeout('heatmap-draw', 0, function() {
+    var overlayProjection = overlay.getProjection();
+
+    var r = 50;
+
+    var min_x = 10000;
+    var min_y = 10000;
+    var max_x = -10000;
+    var max_y = -10000;
+
+    for (level_key in contour_levels) {
+     var current_level = contour_levels[level_key];
+     var current_level_value = levels[level_key];
+
+     for (contour_key in current_level) {
+      var current_contour = current_level[contour_key];
+
+      current_contour.level = current_level_value;
+
+      for (point_key in current_contour) {
+       var current_point = current_contour[point_key];
+
+       current_point.level = current_level_value;
+
+       var p = overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(lat(current_point.y), lon(current_point.x)));
+       //var p = overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(lat(current_point.x), lon(current_point.y)));
+
+       current_point.google = p;
+
+       if (p.x < min_x) {
+        min_x = p.x;
+       }
+       if (p.x > max_x) {
+        max_x = p.x;
+       }
+       if (p.y < min_y) {
+        min_y = p.y;
+       }
+       if (p.y > max_y) {
+        max_y = p.y;
+       }
+      }
+     }
+    }
+
+    var div = overlay.div_;
+
+    div.style.width = (max_x - min_x + 2 * r) + "px";
+    div.style.height = (max_y - min_y + 2 * r) + "px";
+    div.style.left = min_x - r + "px";
+    div.style.top = min_y - r + "px";
+
+    overlay.viz_ = new pv.Panel()
+    .canvas(div)
+    .data(contour_levels)
+    .add(pv.Polygon)
+    .data(function (d) d)
+    .left(function(d) {
+     return d.map(function(b) { return b.google.x - min_x + r });
+    })
+    .top(function(d) {
+     return d.map(function(b) { return b.google.y - min_y + r });
+    })
+    //.interpolate(function() "basis")
+    //.lineJoin("null")
+    //.segmented(false)
+    .fillStyle(function(d) {
+     if (!filled) {
+      return null;
+     }
+
+     var level = d.level;
+     // XXX move level check to another function for speed?
+     if (levels.indexOf(level) >= visible_min && levels.indexOf(level) <= visible_max) {
+      return colours(level).alpha(opacities(level));
+     } else {
+      return null;
+     }
+    })
+    .strokeStyle(function(d) {
+     if (!stroked) {
+      return null;
+     }
+
+     var level = d.level;
+
+     if (levels.indexOf(level) >= visible_min && levels.indexOf(level) <= visible_max) {
+      return '#666';
+     } else {
+      return null;
+     }
+    })
+    .lineWidth(1);
+
+    overlay.viz_.render();
+   });
+  }
+  </script>
+
+  <script type="text/javascript">
+  //data globals
+  var output = output_normal;
+  var data = output.data;
+
+  //ui globals
+  var steps = 8;
+  var step_size;
+  var visible_min = 0;
+  var visible_max = steps;
+  var stroked = true;
+  var filled = true;
+  var overlay;
+
+  var c = new Conrec(),
+  xs, ys, zs,
+  lon, lat,
+  colours,
+  opacities;
+
+  var contours,
+  contour_list,
+  contour_levels,
+  levels;
+
+  console.log = function () {};
+
+  function setup_values() {
+   //var my_max_z = 60 * 45;
+
+   console.log(data);
+
+   step_size = (output.max_z - output.min_z) / steps;
+   //step_size = (my_max_z - output.min_z) / steps;
+   xs = pv.range(0, data[0].length);
+   ys = pv.range(0, data.length);
+   zs = pv.range(output.min_z, output.max_z, step_size);
+   //zs = pv.range(output.min_z, my_max_z, step_size);
+   lon = pv.Scale.linear(xs).range(output.min_lon, output.max_lon);
+   //lat = pv.Scale.linear(ys).range(output.min_lat, output.max_lat);
+   //lon = pv.Scale.linear(xs).range(output.max_lon, output.min_lon);
+   lat = pv.Scale.linear(ys).range(output.max_lat, output.min_lat);
+   colours = pv.Scale.linear(zs).range('#5FFF57', '#D48383');
+   //opacities = pv.Scale.linear(zs).range(0.2, 0.2);
+   opacities = pv.Scale.linear(zs).range(0.2, 0.05);
+  }
+
+  function setup_contours() {
+   contours = c.contour(data, 0, xs.length - 1, 0, ys.length - 1, xs, ys, zs.length, zs);
+   contour_list = c.contourList().sort(levelOrder);
+
+   contour_levels = new Array();
+   levels = new Array();
+
+   for (contour_key in contour_list) {
+    var current_contour = contour_list[contour_key];
+    var current_level = current_contour.level;
+
+    if (levels.indexOf(current_level) < 0) {
+     levels.push(current_level);
+    }
+
+    var current_level_number = levels.indexOf(current_level);
+
+    if (!contour_levels[current_level_number]) {
+     contour_levels[current_level_number] = new Array();
+    }
+
+    contour_levels[current_level_number].push(current_contour);
+   }
+  }
+
+  function levelOrder(a, b) {
+   return a.level - b.level;
+  }
+
+  function update_function(recontour) {
+   console.log('Timeout, drawing...');
+
+   $('#progress').show();
+
+   // XXX Hack to make sure the progress bar shows up.
+   $.doTimeout('draw', 0, function() {
+    setup_controls();
+    setup_values();
+
+    if (recontour) {
+     setup_contours();
+    }
+
+    overlay.draw();
+
+    $('#progress').hide();
+
+    console.log('Drawing finished.');
+   });
+  }
+
+  function setup_controls() {
+   try {
+    $('#layers').slider('destroy');
+   } catch (e) {
+    console.log('Failed to destroy #layers');
+   }
+
+   $('#layers').slider({
+    value: steps,
+    min: 1,
+    max: 50,
+    step: 1,
+    start: function(event, ui) {
+     this.start_value = ui.value;
+
+     $.doTimeout('redraw');
+    },
+    slide: function(event, ui) {
+     steps = ui.value;
+     visible_max = steps;
+
+     $('#layers-input').val(steps);
+
+     $.doTimeout('redraw');
+    },
+    stop: function(event, ui) {
+     if (this.start_value == ui.value) {
+      return;
+     }
+
+     $.doTimeout('redraw', 500, function() {
+      update_function(true);
+     });
+    }
+   });
+
+   try {
+    $('#visible-range').slider('destroy');
+   } catch (e) {
+    console.log('Failed to destroy #visible-range');
+   }
+
+   $('#visible-range').slider({
+    range: true,
+    values: [visible_min, visible_max],
+    min: 0,
+    max: steps,
+    step: 1,
+    start: function(event, ui) {
+     this.start_values = ui.values;
+
+     $.doTimeout('redraw');
+    },
+    slide: function(event, ui) {
+     visible_min = ui.values[0];
+     visible_max = ui.values[1];
+
+     $('#visible-range-input').val(visible_min + ' - ' + visible_max);
+
+     $.doTimeout('redraw');
+    },
+    stop: function(event, ui) {
+     if (this.start_values[0] == ui.values[0] && this.start_values[1] == ui.values[1]) {
+      return;
+     }
+
+     $.doTimeout('redraw', 500, function() { update_function(false) });
+    }
+   });
+
+   $('#visible-range-input').val(visible_min + ' - ' + visible_max);
+   $('#layers-input').val(steps);
+
+   $('#fill-checkbox').click(function() {
+    filled = !filled;
+
+    overlay.render();
+   });
+
+   $('#stroke-checkbox').click(function() {
+    stroked = !stroked;
+
+    overlay.render();
+   });
+  }
+
+  function init() {
+   setup_values();
+   setup_contours();
+
+   var myOptions = {
+    zoom: 7,
+    mapTypeId: google.maps.MapTypeId.SATELLITE
+   };
+
+   var map = new google.maps.Map(document.getElementById("map"), myOptions);
+
+   var swBound = new google.maps.LatLng(output.min_lat, output.min_lon);
+   var neBound = new google.maps.LatLng(output.max_lat, output.max_lon);
+
+   var bounds = new google.maps.LatLngBounds(swBound, neBound);
+
+   map.fitBounds(bounds);
+
+   overlay = new HeatmapOverlay(bounds, map);
+
+   setup_controls();
+  }
+  </script>
+ </head>
+
+ <body onload="init()">
+  <div id="map"></div>
+
+  <div id="progress">
+   Refreshing...
+  </div>
+
+  <div id="controls">
+   <label for="layers-input" id="layers-label">Layers:</label>
+   <input type="text" id="layers-input" />
+
+   <div class="select" id="layers"></div>
+
+   <label for="visible-range-input" id="visible-range-label">Visible range:</label>
+   <input type="text" id="visible-range-input" />
+
+   <div class="select" id="visible-range"></div>
+
+   <label for="fill-checkbox" id="fill-label">Fill each level:</label>
+   <input type="checkbox" id="fill-checkbox" checked="checked" />
+
+   <br />
+
+   <label for="stroke-checkbox" id="stroke-label">Stroke each level:</label>
+   <input type="checkbox" id="stroke-checkbox" checked="checked" />
+  </div>
+ </body>
+</html>
